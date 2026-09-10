@@ -1,5 +1,9 @@
 # Milestone 4 Android libgm bridge verification
 
+Status: passed on a physical Pixel 9a on September 10, 2026. The app loaded
+recent messages, deleted the explicitly selected test message from Google
+Messages, and continued to display incoming-message notifications.
+
 This test proves only the manual Android bridge. It does not connect deletion
 to notifications. Use a disposable incoming message and verify the selection
 carefully: deletion is permanent across synced Google Messages devices.

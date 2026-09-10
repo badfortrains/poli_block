@@ -18,10 +18,11 @@ not yet connect the Android listener to libgm or delete messages automatically.
   imported Google cookies, connect, list recent messages, locate one unique
   exact incoming match, explicitly delete a known message ID, save refreshed
   auth, and disconnect.
-- **Milestone 4 — implemented, awaiting device verification:** a minimal Go
-  wrapper is compiled into an Android AAR. The app can import an existing
-  paired session, encrypt it with Android Keystore, fetch recent incoming
-  messages, and delete one explicitly selected message after confirmation.
+- **Milestone 4 — implemented and device-verified:** a minimal Go wrapper is
+  compiled into an Android AAR. The app can import an existing paired session,
+  encrypt it with Android Keystore, fetch recent incoming messages, and delete
+  one explicitly selected message after confirmation. This was verified on a
+  physical Pixel 9a on September 10, 2026.
 - **Milestones 5–6 — not started.** The notification listener is not connected
   to deletion, and there is no QR credential importer yet.
 
