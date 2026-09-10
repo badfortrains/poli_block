@@ -1,0 +1,14 @@
+.gradle/
+.idea/
+*.iml
+local.properties
+build/
+**/build/
+.DS_Store
+
+# Milestone 3 credentials and session state must never be committed.
+cookies.json
+session.json
+*.session.json
+target-message.txt
+libgm-proof/gmproof

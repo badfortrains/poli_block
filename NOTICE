@@ -1,0 +1,17 @@
+Political SMS Filter
+Copyright (C) 2026 Political SMS Filter contributors
+
+This project is licensed under the GNU Affero General Public License,
+version 3 or (at your option) any later version. See LICENSE.
+
+The milestone-3 command-line proof imports libgm from mautrix-gmessages:
+
+  Project: mautrix-gmessages
+  Author: Tulir Asokan and contributors
+  Source: https://github.com/mautrix/gmessages
+  Version used: v0.2605.0 (commit 986c579fcfd7cc91acb8374677cf85d2c48d9e8c)
+  License: GNU Affero General Public License v3 or later
+
+libgm implements an unofficial Google Messages web protocol. Google Messages
+is a trademark of Google LLC; this project is not affiliated with or endorsed
+by Google.
