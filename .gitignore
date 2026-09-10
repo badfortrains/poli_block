@@ -12,3 +12,7 @@ session.json
 *.session.json
 target-message.txt
 libgm-proof/gmproof
+libgm-android/.tools/
+libgm-android/*.aar
+libgm-android/*.jar
+app/libs/*-sources.jar

@@ -4,13 +4,22 @@ Copyright (C) 2026 Political SMS Filter contributors
 This project is licensed under the GNU Affero General Public License,
 version 3 or (at your option) any later version. See LICENSE.
 
-The milestone-3 command-line proof imports libgm from mautrix-gmessages:
+The milestone-3 command-line proof and milestone-4 Android bridge import libgm
+from mautrix-gmessages:
 
   Project: mautrix-gmessages
   Author: Tulir Asokan and contributors
   Source: https://github.com/mautrix/gmessages
   Version used: v0.2605.0 (commit 986c579fcfd7cc91acb8374677cf85d2c48d9e8c)
   License: GNU Affero General Public License v3 or later
+
+The Android bridge is generated with Go Mobile:
+
+  Project: golang.org/x/mobile
+  Authors: The Go Authors
+  Source: https://go.googlesource.com/mobile
+  Version used: v0.0.0-20260908204917-8b95e45f8d3e
+  License: BSD 3-Clause; see THIRD_PARTY_NOTICES
 
 libgm implements an unofficial Google Messages web protocol. Google Messages
 is a trademark of Google LLC; this project is not affiliated with or endorsed

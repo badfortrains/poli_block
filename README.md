@@ -4,7 +4,7 @@ An Android proof-of-concept that leaves Google Messages as the default SMS/RCS
 app, makes its own notifications silent, and selectively replaces allowed
 notifications. Messages containing `Stop2End` (case-insensitive) are suppressed.
 
-This repository implements development milestones 1–3. It deliberately does
+This repository implements development milestones 1–4. It deliberately does
 not yet connect the Android listener to libgm or delete messages automatically.
 
 ## Status
@@ -18,8 +18,12 @@ not yet connect the Android listener to libgm or delete messages automatically.
   imported Google cookies, connect, list recent messages, locate one unique
   exact incoming match, explicitly delete a known message ID, save refreshed
   auth, and disconnect.
-- **Milestones 4–6 — not started.** There is no Android libgm binding,
-  background deletion worker, or QR credential importer yet.
+- **Milestone 4 — implemented, awaiting device verification:** a minimal Go
+  wrapper is compiled into an Android AAR. The app can import an existing
+  paired session, encrypt it with Android Keystore, fetch recent incoming
+  messages, and delete one explicitly selected message after confirmation.
+- **Milestones 5–6 — not started.** The notification listener is not connected
+  to deletion, and there is no QR credential importer yet.
 
 The project is intended for personal/sideloaded use. libgm uses an unofficial
 protocol that can change without notice.
@@ -29,6 +33,7 @@ protocol that can change without notice.
 ```text
 app/            Android notification replacement and filter proof
 libgm-proof/    Independent desktop Go/libgm command-line proof
+libgm-android/  Minimal Go Mobile wrapper and reproducible AAR build script
 docs/           Manual device verification checklists
 ```
 
@@ -39,6 +44,8 @@ Requirements:
 - Android Studio Quail 4 or compatible
 - Android SDK Platform 37 and Build Tools 36.0.0
 - JDK 17 or newer (Android Studio's bundled JDK works)
+- Android NDK 28.2.13676358 only when rebuilding the checked-in Go AAR
+- Go 1.26 or newer only when rebuilding the checked-in Go AAR
 
 From the repository root on macOS:
 
@@ -75,6 +82,28 @@ silent notification as its event signal.
 
 See [docs/device-verification.md](docs/device-verification.md) for the milestone
 1–2 acceptance test.
+
+## Verify the Android libgm bridge
+
+The checked-in `app/libs/libgmbridge.aar` contains arm64 device and x86_64
+emulator libraries. To regenerate it from the pinned Go source:
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+./libgm-android/build-android.sh
+```
+
+Milestone 4 intentionally uses a manual document import rather than putting
+credentials in app source or build files. Transfer a copy of the paired
+`libgm-proof/session.json` to the phone, import it from the app, then remove the
+unencrypted transferred copy. The app validates it and stores only an
+AES-GCM-encrypted copy backed by an app-only Android Keystore key. Every
+connection saves refreshed auth before disconnecting.
+
+See [docs/milestone-4-device-verification.md](docs/milestone-4-device-verification.md)
+for the conservative one-message deletion test. The notification listener does
+not invoke this bridge in milestone 4.
 
 ## Build and test the libgm proof
 
@@ -167,7 +196,11 @@ session file for subsequent tests; delete both credential files when finished.
 - The CLI suppresses libgm's internal logs by default.
 - The CLI refuses symlinked or group/world-readable session files.
 - Exact matching rejects outgoing and ambiguous results.
-- Automatic Android inbox deletion is not present in milestones 1–3.
+- Imported Android auth is AES-GCM encrypted with an Android Keystore key and
+  excluded from backup/device transfer.
+- Android deletion requires a recent incoming message to be selected manually
+  and confirmed explicitly.
+- Automatic Android inbox deletion is not present in milestones 1–4.
 
 ## License
 

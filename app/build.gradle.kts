@@ -10,8 +10,8 @@ android {
         applicationId = "dev.polisms.filter"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     compileOptions {
@@ -28,5 +28,8 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/libgmbridge.aar"))
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
 }
