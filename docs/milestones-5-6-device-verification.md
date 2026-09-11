@@ -1,7 +1,7 @@
 # Milestones 5–6 device verification
 
-Use disposable incoming messages. Automatic deletion is intentionally strict:
-false negatives are acceptable, but deleting a legitimate message is not.
+Use disposable incoming messages. Automatic archiving is intentionally strict:
+false negatives are acceptable, but archiving a legitimate conversation is not.
 
 ## Milestone 6 — QR bootstrap
 
@@ -45,9 +45,11 @@ Expected:
 - Google Messages itself remains silent.
 - Its notification is canceled and no vibration occurs.
 - WorkManager connects only when a network is available.
-- The message disappears from Google Messages after one unique exact match.
-- The app status reports that the last blocked message was deleted.
-- Other messages in that conversation remain.
+- The conversation moves out of the Google Messages inbox after one unique
+  exact message match.
+- The app status reports that the conversation containing the last blocked
+  message was archived.
+- Every message remains available in the archived conversation.
 
 ## Fail-safe checks
 

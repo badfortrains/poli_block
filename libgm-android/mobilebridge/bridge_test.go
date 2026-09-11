@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNewClientRejectsInvalidAndIncompleteAuth(t *testing.T) {
@@ -50,5 +51,37 @@ func TestOutgoingMessageIsNotIncoming(t *testing.T) {
 	}
 	if isIncoming(message) {
 		t.Fatal("outgoing message was treated as incoming")
+	}
+}
+
+func TestArchiveConversationRequest(t *testing.T) {
+	request := newArchiveConversationRequest("conversation-1")
+	if got := int32(request.GetAction()); got != 4 {
+		t.Fatalf("request action = %d", got)
+	}
+	if got := request.GetConversationID(); got != "conversation-1" {
+		t.Fatalf("request conversation ID = %q", got)
+	}
+	update := request.GetUpdateData()
+	if update == nil {
+		t.Fatal("request update data is nil")
+	}
+	if got := update.GetConversationID(); got != "conversation-1" {
+		t.Fatalf("update conversation ID = %q", got)
+	}
+	if got := update.GetStatus(); got != gmproto.ConversationStatus_ARCHIVED {
+		t.Fatalf("update status = %v", got)
+	}
+
+	wire, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	var decoded gmproto.UpdateConversationRequest
+	if err = proto.Unmarshal(wire, &decoded); err != nil {
+		t.Fatalf("unmarshal request: %v", err)
+	}
+	if got := int32(decoded.GetAction()); got != 4 {
+		t.Fatalf("wire request action = %d", got)
 	}
 }

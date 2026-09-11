@@ -49,7 +49,7 @@ class MainActivity : Activity() {
     private lateinit var importButton: Button
     private lateinit var scanPairButton: Button
     private lateinit var fetchButton: Button
-    private lateinit var deleteButton: Button
+    private lateinit var archiveButton: Button
     private lateinit var clearButton: Button
     private lateinit var messageSpinner: Spinner
 
@@ -116,7 +116,7 @@ class MainActivity : Activity() {
 
         content.addView(text("Filter", 18f, Color.BLACK, 26, 6))
         content.addView(text("Messages containing (case-insensitive): ${Stop2EndFilter.KEYWORDS.joinToString()}", 16f, Color.DKGRAY, 0, 16))
-        automaticDeletionStatus = text("Checking automatic deletion status…", 15f, Color.DKGRAY, 0, 10)
+        automaticDeletionStatus = text("Checking automatic archive status…", 15f, Color.DKGRAY, 0, 10)
         content.addView(automaticDeletionStatus)
 
         content.addView(text("Filter vibration", 18f, Color.BLACK, 12, 6))
@@ -150,8 +150,8 @@ class MainActivity : Activity() {
         }
         content.addView(messageSpinner)
 
-        deleteButton = button("Delete selected test message") { confirmSelectedDeletion() }
-        content.addView(deleteButton)
+        archiveButton = button("Archive selected test conversation") { confirmSelectedArchive() }
+        content.addView(archiveButton)
 
         clearButton = button("Clear imported credentials") { confirmClearCredentials() }
         content.addView(clearButton)
@@ -315,27 +315,28 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun confirmSelectedDeletion() {
+    private fun confirmSelectedArchive() {
         val selected = messages.getOrNull(messageSpinner.selectedItemPosition) ?: return
         AlertDialog.Builder(this)
-            .setTitle("Delete this message?")
+            .setTitle("Archive this conversation?")
             .setMessage(
-                "This permanently deletes the selected message from Google Messages and its synced devices.\n\n" +
+                "This moves the entire conversation containing the selected message out of the Google Messages inbox. " +
+                    "Messages in the conversation are not deleted.\n\n" +
                     selected.displayLabel(maxTextLength = 160) +
                     messageTimeLabel(selected) +
-                    "\n\nVerify this is your disposable test message before continuing.",
+                    "\n\nVerify this is the conversation you want to archive before continuing.",
             )
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Delete") { _, _ -> deleteMessage(selected) }
+            .setPositiveButton("Archive") { _, _ -> archiveConversation(selected) }
             .show()
     }
 
-    private fun deleteMessage(message: LibgmMessage) {
-        runOperation("Deleting the selected message…", deletionAttempt = true) {
-            sessionRunner.withConnectedClient { client -> client.deleteMessage(message.messageId) }
+    private fun archiveConversation(message: LibgmMessage) {
+        runOperation("Archiving the selected conversation…", mutationAttempt = true) {
+            sessionRunner.withConnectedClient { client -> client.archiveConversation(message.conversationId) }
             runOnUiThreadIfAlive {
-                updateMessageChoices(messages.filterNot { it.messageId == message.messageId })
-                operationStatus.text = "✓ Selected message deleted. Confirm it disappeared from the phone."
+                updateMessageChoices(messages.filterNot { it.conversationId == message.conversationId })
+                operationStatus.text = "✓ Selected conversation archived. Confirm it moved out of the inbox."
             }
         }
     }
@@ -343,7 +344,7 @@ class MainActivity : Activity() {
     private fun confirmClearCredentials() {
         AlertDialog.Builder(this)
             .setTitle("Clear imported credentials?")
-            .setMessage("The encrypted paired session, pending deletion targets, and their Android Keystore keys will be removed from this app.")
+            .setMessage("The encrypted paired session, pending archive targets, and their Android Keystore keys will be removed from this app.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Clear") { _, _ ->
                 clearCredentials()
@@ -362,7 +363,7 @@ class MainActivity : Activity() {
             }
             runOnUiThreadIfAlive {
                 updateMessageChoices(emptyList())
-                operationStatus.text = "✓ Imported credentials and pending deletion data cleared."
+                operationStatus.text = "✓ Imported credentials and pending archive data cleared."
                 refreshAutomaticDeletionStatus()
             }
         }
@@ -370,7 +371,7 @@ class MainActivity : Activity() {
 
     private fun runOperation(
         startingMessage: String,
-        deletionAttempt: Boolean = false,
+        mutationAttempt: Boolean = false,
         operation: () -> Unit,
     ) {
         if (busy) return
@@ -381,8 +382,8 @@ class MainActivity : Activity() {
                 operation()
             } catch (error: Throwable) {
                 runOnUiThreadIfAlive {
-                    val action = if (deletionAttempt) {
-                        "Delete may have completed. Check the phone before retrying"
+                    val action = if (mutationAttempt) {
+                        "Archive may have completed. Check the phone before retrying"
                     } else {
                         "Operation failed"
                     }
@@ -430,7 +431,7 @@ class MainActivity : Activity() {
         ).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
-        deleteButton.isEnabled = !busy && updated.isNotEmpty()
+        archiveButton.isEnabled = !busy && updated.isNotEmpty()
     }
 
     private fun refreshStatus() {
@@ -443,15 +444,16 @@ class MainActivity : Activity() {
         if (!::automaticDeletionStatus.isInitialized) return
         val status = deletionStatusStore.load()
         val summary = when (status.state) {
-            DeletionState.NEVER -> "No automatic deletion attempted yet"
-            DeletionState.QUEUED -> "Deletion queued; waiting for network/work execution"
+            DeletionState.NEVER -> "No automatic archive attempted yet"
+            DeletionState.QUEUED -> "Archive queued; waiting for network/work execution"
             DeletionState.RETRYING -> "Transient failure; bounded retry ${status.attempt + 1} of 3 queued"
-            DeletionState.DELETED -> "✓ Last blocked message was matched uniquely and deleted"
+            DeletionState.ARCHIVED -> "✓ Conversation containing the last uniquely matched message was archived"
+            DeletionState.DELETED -> "Legacy result: last blocked message was deleted"
             DeletionState.NO_MATCH -> "Preserved: no high-confidence match"
             DeletionState.AMBIGUOUS -> "Preserved: matching result was ambiguous"
             DeletionState.AUTH_REQUIRED -> "⚠ Pairing needs repair; message was preserved"
-            DeletionState.UNCERTAIN -> "⚠ Delete outcome was uncertain; no automatic retry"
-            DeletionState.FAILED -> "⚠ Deletion failed safely after bounded attempts"
+            DeletionState.UNCERTAIN -> "⚠ Archive outcome was uncertain; no automatic retry"
+            DeletionState.FAILED -> "⚠ Archiving failed safely after bounded attempts"
         }
         val time = if (status.timestampMillis > 0) {
             " · " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
@@ -470,7 +472,7 @@ class MainActivity : Activity() {
         importButton.isEnabled = !busy
         fetchButton.isEnabled = !busy && hasSession
         clearButton.isEnabled = !busy && hasSession
-        deleteButton.isEnabled = !busy && messages.isNotEmpty()
+        archiveButton.isEnabled = !busy && messages.isNotEmpty()
     }
 
     private fun setBusy(value: Boolean) {

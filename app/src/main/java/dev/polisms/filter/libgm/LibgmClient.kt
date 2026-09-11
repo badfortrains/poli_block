@@ -10,7 +10,7 @@ interface LibgmClient {
         messagesPerConversation: Int,
     ): ByteArray
 
-    fun deleteMessage(messageId: String)
+    fun archiveConversation(conversationId: String)
 
     fun updatedAuthData(): ByteArray
 
@@ -39,7 +39,7 @@ private class GoLibgmClient(
         messagesPerConversation.toLong(),
     )
 
-    override fun deleteMessage(messageId: String) = client.deleteMessage(messageId)
+    override fun archiveConversation(conversationId: String) = client.archiveConversation(conversationId)
 
     override fun updatedAuthData(): ByteArray = client.updatedAuthData()
 

@@ -98,7 +98,7 @@ class LibgmSessionRunnerTest {
             messagesPerConversation: Int,
         ): ByteArray = byteArrayOf()
 
-        override fun deleteMessage(messageId: String) = Unit
+        override fun archiveConversation(conversationId: String) = Unit
 
         override fun updatedAuthData(): ByteArray = updatedAuth.copyOf()
 

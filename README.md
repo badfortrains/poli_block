@@ -5,7 +5,7 @@ app, keeps its notifications silent, and vibrates directly for allowed messages.
 Messages containing `Stop2End` (case-insensitive) are suppressed.
 
 This repository implements development milestones 1–6. Milestones 1–4 are
-device-verified; the new automatic deletion and QR bootstrap paths await their
+device-verified; the new automatic archiving and QR bootstrap paths await their
 final physical-device acceptance tests.
 
 ## Status
@@ -20,14 +20,15 @@ final physical-device acceptance tests.
   auth, and disconnect.
 - **Milestone 4 — implemented and device-verified:** a minimal Go wrapper is
   compiled into an Android AAR. The app can import an existing paired session,
-  encrypt it with Android Keystore, fetch recent incoming messages, and delete
-  one explicitly selected message after confirmation. This was verified on a
-  physical Pixel 9a on September 10, 2026.
+  encrypt it with Android Keystore, and fetch recent incoming messages. The
+  original one-message delete operation was verified on a physical Pixel 9a on
+  September 10, 2026; it has since been replaced with conversation archiving
+  and awaits another device check.
 - **Milestone 5 — implemented, awaiting device verification:** blocked
-  notifications enqueue encrypted WorkManager jobs. A message is deleted only
+  notifications enqueue encrypted WorkManager jobs. A conversation is archived only
   when exact text, normalized sender, incoming direction, and a two-minute
   timestamp window yield one unique candidate. Work is retried at most three
-  times; ambiguous and uncertain deletes are never retried.
+  times; ambiguous and uncertain archive requests are never retried.
 - **Milestone 6 — implemented, awaiting device verification:** the offline
   desktop helper converts a `/web/config` cURL request to a versioned compressed
   QR. Android scans it without camera permission, validates and minimizes the
@@ -120,9 +121,9 @@ connection persists refreshed auth before disconnecting, and all libgm
 operations are serialized to prevent competing refreshes.
 
 See [docs/milestone-4-device-verification.md](docs/milestone-4-device-verification.md)
-for the conservative one-message deletion test. See
+for the manual conversation-archive test. See
 [docs/milestones-5-6-device-verification.md](docs/milestones-5-6-device-verification.md)
-for automatic deletion and QR pairing acceptance tests.
+for automatic archiving and QR pairing acceptance tests.
 
 ## Build and test the libgm proof
 
@@ -217,14 +218,14 @@ session file for subsequent tests; delete both credential files when finished.
 - Exact matching rejects outgoing and ambiguous results.
 - Imported Android auth is AES-GCM encrypted with an Android Keystore key and
   excluded from backup/device transfer.
-- Pending automatic-deletion targets are separately encrypted at rest and are
+- Pending automatic-archive targets are separately encrypted at rest and are
   removed after a terminal outcome.
-- Android deletion requires a recent incoming message to be selected manually
+- Android archiving requires a recent incoming message to be selected manually
   and confirmed explicitly, or a unique automatic match across exact text,
   sender, direction, and timestamp.
-- Automatic deletion uses WorkManager network constraints, exponential backoff,
+- Automatic archiving uses WorkManager network constraints, exponential backoff,
   and no more than three attempts. Missing and ambiguous matches preserve the
-  inbox message; uncertain delete responses are not retried.
+  inbox conversation; uncertain archive responses are not retried.
 - Notification bodies, senders, raw cookies, and auth data are never logged.
 
 ## License

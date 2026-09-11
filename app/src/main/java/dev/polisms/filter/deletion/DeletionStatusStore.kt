@@ -6,6 +6,8 @@ enum class DeletionState {
     NEVER,
     QUEUED,
     RETRYING,
+    ARCHIVED,
+    // Retained so status written by versions that deleted messages still decodes accurately.
     DELETED,
     NO_MATCH,
     AMBIGUOUS,

@@ -108,24 +108,42 @@ func (c *Client) FetchRecentIncomingMessages(conversationCount, messagesPerConve
 	return json.Marshal(result)
 }
 
-// DeleteMessage deletes exactly one caller-selected message.
-func (c *Client) DeleteMessage(messageID string) error {
+// ArchiveConversation moves one caller-selected conversation out of the inbox.
+func (c *Client) ArchiveConversation(conversationID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err := c.requireConnected(); err != nil {
 		return err
 	}
-	if strings.TrimSpace(messageID) == "" {
-		return errors.New("message ID is empty")
+	if strings.TrimSpace(conversationID) == "" {
+		return errors.New("conversation ID is empty")
 	}
-	response, err := c.native.DeleteMessage(messageID)
+	response, err := c.native.UpdateConversation(newArchiveConversationRequest(conversationID))
 	if err != nil {
-		return fmt.Errorf("delete message: %w", err)
+		return fmt.Errorf("archive conversation: %w", err)
 	}
 	if !response.GetSuccess() {
-		return errors.New("Google Messages returned an unsuccessful delete response")
+		return errors.New("Google Messages returned an unsuccessful archive response")
 	}
 	return nil
+}
+
+func newArchiveConversationRequest(conversationID string) *gmproto.UpdateConversationRequest {
+	return &gmproto.UpdateConversationRequest{
+		// libgm v0.2605.0's generated enum omits ARCHIVE, but Google Messages
+		// uses wire value 4 for this request action. Protobuf enums preserve
+		// unknown numeric values, so send it explicitly until libgm exposes it.
+		Action:         gmproto.ConversationActionStatus(4),
+		ConversationID: conversationID,
+		Data: &gmproto.UpdateConversationRequest_UpdateData{
+			UpdateData: &gmproto.UpdateConversationData{
+				ConversationID: conversationID,
+				Data: &gmproto.UpdateConversationData_Status{
+					Status: gmproto.ConversationStatus_ARCHIVED,
+				},
+			},
+		},
+	}
 }
 
 // UpdatedAuthData returns the newest AuthData so Android can encrypt and save

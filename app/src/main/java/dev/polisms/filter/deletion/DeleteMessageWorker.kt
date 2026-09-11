@@ -35,11 +35,11 @@ class DeleteMessageWorker(
         }
 
         if (!authStore.hasSession()) {
-            Log.w(TAG, "Deletion stopped: Google Messages pairing is required")
+            Log.w(TAG, "Archiving stopped: Google Messages pairing is required")
             return terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
         }
 
-        var deleteIssued = false
+        var archiveIssued = false
         return try {
             val match = sessionRunner.withConnectedClient { client ->
                 val encoded = client.fetchRecentIncomingMessages(
@@ -57,11 +57,11 @@ class DeleteMessageWorker(
                         if (!statusStore.isAutomaticDeletionEnabled()) {
                             throw AutomaticDeletionDisabledException()
                         }
-                        deleteIssued = true
+                        archiveIssued = true
                         try {
-                            client.deleteMessage(result.message.messageId)
+                            client.archiveConversation(result.message.conversationId)
                         } catch (error: Throwable) {
-                            throw DeletionRequestException(error)
+                            throw ArchiveRequestException(error)
                         }
                     }
                     MatchResult.None,
@@ -72,25 +72,25 @@ class DeleteMessageWorker(
             }
             when (match) {
                 is MatchResult.Unique -> {
-                    Log.i(TAG, "Unique message match deleted")
-                    terminal(targetId, DeletionState.DELETED, Result.success())
+                    Log.i(TAG, "Conversation containing unique message match archived")
+                    terminal(targetId, DeletionState.ARCHIVED, Result.success())
                 }
                 MatchResult.None -> {
-                    Log.i(TAG, "No high-confidence message match; nothing deleted")
+                    Log.i(TAG, "No high-confidence message match; nothing archived")
                     terminal(targetId, DeletionState.NO_MATCH, Result.success())
                 }
                 MatchResult.Ambiguous -> {
-                    Log.i(TAG, "Ambiguous message match; nothing deleted")
+                    Log.i(TAG, "Ambiguous message match; nothing archived")
                     terminal(targetId, DeletionState.AMBIGUOUS, Result.success())
                 }
             }
         } catch (_: AutomaticDeletionDisabledException) {
             terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
-        } catch (_: DeletionRequestException) {
-            Log.w(TAG, "Delete response was uncertain; the exact message ID will not be retried")
+        } catch (_: ArchiveRequestException) {
+            Log.w(TAG, "Archive response was uncertain; the exact conversation ID will not be retried")
             terminal(targetId, DeletionState.UNCERTAIN, Result.failure())
         } catch (error: SessionPersistenceException) {
-            val state = if (deleteIssued && error.operationCompleted) {
+            val state = if (archiveIssued && error.operationCompleted) {
                 DeletionState.UNCERTAIN
             } else {
                 DeletionState.FAILED
@@ -99,14 +99,14 @@ class DeleteMessageWorker(
             terminal(targetId, state, Result.failure())
         } catch (error: Throwable) {
             if (DeletionFailureClassifier.isAuthenticationFailure(error)) {
-                Log.w(TAG, "Deletion stopped due to an authentication failure")
+                Log.w(TAG, "Archiving stopped due to an authentication failure")
                 terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
             } else if (runAttemptCount + 1 < MAX_ATTEMPTS) {
-                Log.w(TAG, "Transient deletion failure; scheduling a bounded retry")
+                Log.w(TAG, "Transient archiving failure; scheduling a bounded retry")
                 statusStore.record(DeletionState.RETRYING, runAttemptCount + 1)
                 Result.retry()
             } else {
-                Log.w(TAG, "Deletion failed after the final retry")
+                Log.w(TAG, "Archiving failed after the final retry")
                 terminal(targetId, DeletionState.FAILED, Result.failure())
             }
         }
@@ -118,7 +118,7 @@ class DeleteMessageWorker(
         return result
     }
 
-    private class DeletionRequestException(cause: Throwable) : Exception(cause)
+    private class ArchiveRequestException(cause: Throwable) : Exception(cause)
 
     private class AutomaticDeletionDisabledException : Exception()
 

@@ -40,9 +40,9 @@ class MessagesNotificationListener : NotificationListenerService() {
         if (blocked) {
             cancelNotification(message.notificationKey)
             if (deletionScheduler.enqueue(message)) {
-                Log.i(TAG, "Blocked notification suppressed and deletion work queued")
+                Log.i(TAG, "Blocked notification suppressed and archive work queued")
             } else {
-                Log.w(TAG, "Blocked notification suppressed but deletion work could not be queued")
+                Log.w(TAG, "Blocked notification suppressed but archive work could not be queued")
             }
             return
         }

@@ -1,12 +1,12 @@
 # Milestone 4 Android libgm bridge verification
 
-Status: passed on a physical Pixel 9a on September 10, 2026. The app loaded
-recent messages, deleted the explicitly selected test message from Google
-Messages, and continued to display incoming-message notifications.
+Status: the original delete operation passed on a physical Pixel 9a on
+September 10, 2026. The replacement conversation-archive operation awaits
+device verification.
 
-This test proves only the manual Android bridge. It does not connect deletion
-to notifications. Use a disposable incoming message and verify the selection
-carefully: deletion is permanent across synced Google Messages devices.
+This test proves only the manual Android bridge. It does not connect archiving
+to notifications. Use a disposable conversation and verify the selection
+carefully: the entire conversation will move out of the inbox.
 
 ## Prepare the phone
 
@@ -26,7 +26,7 @@ The app's encrypted copy is excluded from Android backup and device transfer.
 **Clear imported credentials** removes both the ciphertext and its app-only
 Android Keystore key.
 
-## Fetch without deleting
+## Fetch without archiving
 
 1. Send the phone a distinctive disposable SMS from another number.
 2. Tap **Fetch recent incoming messages**.
@@ -38,25 +38,26 @@ Expected: the app starts a short-lived libgm connection, fetches a small recent
 window, persists refreshed auth, and disconnects. It does not list outgoing
 messages returned by the bridge.
 
-## Delete exactly one known message
+## Archive one known conversation
 
 1. Select the distinctive disposable message in the spinner.
-2. Tap **Delete selected test message**.
-3. Read the confirmation dialog again and tap **Delete** only if its preview is
-   the intended test message.
+2. Tap **Archive selected test conversation**.
+3. Read the confirmation dialog again and tap **Archive** only if its preview
+   belongs to the intended conversation.
 4. Wait for the success status, then open Google Messages on the phone.
 
 Expected:
 
-- The selected message disappears from Google Messages.
-- Other messages in the same conversation remain.
-- The deleted item disappears from the app's current selection list.
+- The conversation moves from the Google Messages inbox to its archive.
+- All messages in the conversation remain available in the archive.
+- Every fetched item from that conversation disappears from the app's current
+  selection list.
 - A later **Fetch recent incoming messages** still connects successfully,
   proving the refreshed auth was retained.
 
-If the app reports that deletion may have completed, inspect Google Messages
-before retrying. This avoids accidentally issuing a second destructive request
-after an uncertain network or auth-save result.
+If the app reports that archiving may have completed, inspect Google Messages
+before retrying. This avoids issuing a redundant request after an uncertain
+network or auth-save result.
 
 ## Cleanup
 
