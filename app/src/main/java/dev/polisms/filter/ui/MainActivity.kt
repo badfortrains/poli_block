@@ -115,7 +115,7 @@ class MainActivity : Activity() {
         })
 
         content.addView(text("Filter", 18f, Color.BLACK, 26, 6))
-        content.addView(text("Messages containing (case-insensitive): ${Stop2EndFilter.KEYWORD}", 16f, Color.DKGRAY, 0, 16))
+        content.addView(text("Messages containing (case-insensitive): ${Stop2EndFilter.KEYWORDS.joinToString()}", 16f, Color.DKGRAY, 0, 16))
         automaticDeletionStatus = text("Checking automatic deletion status…", 15f, Color.DKGRAY, 0, 10)
         content.addView(automaticDeletionStatus)
 

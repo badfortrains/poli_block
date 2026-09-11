@@ -17,7 +17,7 @@ class MessageMatcher(
 ) {
     fun find(target: DeletionTarget, messages: List<LibgmMessage>): MatchResult {
         val candidates = messages.filter { candidate ->
-            exactText(target.text, candidate.text) &&
+            textMatches(target.text, candidate.text) &&
                 senderMatches(target.sender, candidate.sender) &&
                 timestampMatches(target.timestampMillis, candidate.timestampMicros)
         }
@@ -28,8 +28,13 @@ class MessageMatcher(
         }
     }
 
-    private fun exactText(notificationText: String, messageText: String): Boolean =
-        notificationText.replace("\r\n", "\n") == messageText.replace("\r\n", "\n")
+    private fun textMatches(notificationText: String, messageText: String): Boolean {
+        val notificationPrefix = notificationText
+            .replace("\r\n", "\n")
+            .take(TEXT_PREFIX_LENGTH)
+        val normalizedMessage = messageText.replace("\r\n", "\n")
+        return normalizedMessage.startsWith(notificationPrefix)
+    }
 
     private fun senderMatches(notificationSender: String?, messageSender: String): Boolean {
         val expected = notificationSender?.takeIf { it.isNotBlank() } ?: return true
@@ -60,6 +65,7 @@ class MessageMatcher(
     }
 
     companion object {
+        const val TEXT_PREFIX_LENGTH = 100
         const val DEFAULT_TIMESTAMP_TOLERANCE_MILLIS = 2 * 60 * 1_000L
     }
 }

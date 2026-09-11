@@ -19,13 +19,23 @@ class Stop2EndFilterTest {
     }
 
     @Test
+    fun blocksStopToQuitCaseInsensitively() {
+        assertTrue(filter.shouldBlock(message("Text stop TO QUIT")))
+    }
+
+    @Test
+    fun blocksStopToEndCaseInsensitively() {
+        assertTrue(filter.shouldBlock(message("Stop to end")))
+    }
+
+    @Test
     fun allowsOrdinaryMessage() {
         assertFalse(filter.shouldBlock(message("Hey, want to get dinner tomorrow?")))
     }
 
     @Test
     fun doesNotBlockSimilarButDifferentText() {
-        assertFalse(filter.shouldBlock(message("Stop to end")))
+        assertFalse(filter.shouldBlock(message("Stop at the end")))
     }
 
     private fun message(text: String) = IncomingMessageNotification(

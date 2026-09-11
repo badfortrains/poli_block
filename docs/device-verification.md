@@ -45,6 +45,8 @@ Send each SMS separately:
 Campaign update. Stop2End
 Campaign update. stop2end
 Campaign update. STOP2END
+Campaign update. STOP to quit
+Campaign update. Stop to End
 ```
 
 Expected for each:
@@ -54,10 +56,11 @@ Expected for each:
 - Political SMS Filter posts no notification.
 - No sound or vibration occurs, assuming Google Messages was configured silent.
 
-Finally, send:
+Finally, send a similar message that does not contain one of the configured
+phrases:
 
 ```text
-This says stop to end, but not the keyword.
+This says stop at the end, but not the keyword.
 ```
 
 Expected: its Google Messages notification remains and it receives one direct vibration.

@@ -14,7 +14,7 @@ class MessageMatcherTest {
     )
 
     @Test
-    fun `one exact incoming candidate is unique`() {
+    fun `one matching incoming candidate is unique`() {
         val result = matcher.find(target, listOf(candidate()))
 
         assertTrue(result is MatchResult.Unique)
@@ -22,7 +22,7 @@ class MessageMatcherTest {
     }
 
     @Test
-    fun `duplicate exact candidates are ambiguous`() {
+    fun `duplicate matching candidates are ambiguous`() {
         val result = matcher.find(
             target,
             listOf(candidate("message-1"), candidate("message-2")),
@@ -32,8 +32,37 @@ class MessageMatcherTest {
     }
 
     @Test
-    fun `text comparison is case sensitive and exact`() {
+    fun `text comparison is case sensitive`() {
         val result = matcher.find(target, listOf(candidate(text = "Campaign update. stop2end")))
+
+        assertEquals(MatchResult.None, result)
+    }
+
+    @Test
+    fun `truncated notification text matches the beginning of a message`() {
+        val truncatedTarget = target.copy(text = "Campaign update. Stop2End")
+        val result = matcher.find(
+            truncatedTarget,
+            listOf(candidate(text = "Campaign update. Stop2End with additional details")),
+        )
+
+        assertTrue(result is MatchResult.Unique)
+    }
+
+    @Test
+    fun `text after the first one hundred characters is ignored`() {
+        val sharedPrefix = "a".repeat(MessageMatcher.TEXT_PREFIX_LENGTH)
+        val longTarget = target.copy(text = sharedPrefix + "notification ending")
+        val result = matcher.find(longTarget, listOf(candidate(text = sharedPrefix + "message ending")))
+
+        assertTrue(result is MatchResult.Unique)
+    }
+
+    @Test
+    fun `text mismatch within the first one hundred characters preserves the message`() {
+        val sharedPrefix = "a".repeat(MessageMatcher.TEXT_PREFIX_LENGTH - 1)
+        val longTarget = target.copy(text = sharedPrefix + "x")
+        val result = matcher.find(longTarget, listOf(candidate(text = sharedPrefix + "y")))
 
         assertEquals(MatchResult.None, result)
     }
