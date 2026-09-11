@@ -4,8 +4,9 @@ An Android proof-of-concept that leaves Google Messages as the default SMS/RCS
 app, makes its own notifications silent, and selectively replaces allowed
 notifications. Messages containing `Stop2End` (case-insensitive) are suppressed.
 
-This repository implements development milestones 1–4. It deliberately does
-not yet connect the Android listener to libgm or delete messages automatically.
+This repository implements development milestones 1–6. Milestones 1–4 are
+device-verified; the new automatic deletion and QR bootstrap paths await their
+final physical-device acceptance tests.
 
 ## Status
 
@@ -23,8 +24,15 @@ not yet connect the Android listener to libgm or delete messages automatically.
   encrypt it with Android Keystore, fetch recent incoming messages, and delete
   one explicitly selected message after confirmation. This was verified on a
   physical Pixel 9a on September 10, 2026.
-- **Milestones 5–6 — not started.** The notification listener is not connected
-  to deletion, and there is no QR credential importer yet.
+- **Milestone 5 — implemented, awaiting device verification:** blocked
+  notifications enqueue encrypted WorkManager jobs. A message is deleted only
+  when exact text, normalized sender, incoming direction, and a two-minute
+  timestamp window yield one unique candidate. Work is retried at most three
+  times; ambiguous and uncertain deletes are never retried.
+- **Milestone 6 — implemented, awaiting device verification:** the offline
+  desktop helper converts a `/web/config` cURL request to a versioned compressed
+  QR. Android scans it without camera permission, validates and minimizes the
+  cookie set, displays the pairing emoji, and encrypts final libgm auth.
 
 The project is intended for personal/sideloaded use. libgm uses an unofficial
 protocol that can change without notice.
@@ -35,6 +43,7 @@ protocol that can change without notice.
 app/            Android notification replacement and filter proof
 libgm-proof/    Independent desktop Go/libgm command-line proof
 libgm-android/  Minimal Go Mobile wrapper and reproducible AAR build script
+tools/          Offline desktop credential QR helper
 docs/           Manual device verification checklists
 ```
 
@@ -77,6 +86,8 @@ On first launch:
    message channels to no sound and no vibration.
 5. Tap **Test replacement notification** and confirm this app's `Messages`
    channel produces the desired sound/vibration.
+6. Complete Google Messages pairing using the offline QR flow below, or retain
+   an already imported milestone-4 session.
 
 Do not disable Google Messages notifications entirely: the listener needs the
 silent notification as its event signal.
@@ -84,7 +95,7 @@ silent notification as its event signal.
 See [docs/device-verification.md](docs/device-verification.md) for the milestone
 1–2 acceptance test.
 
-## Verify the Android libgm bridge
+## Android libgm bridge and QR pairing
 
 The checked-in `app/libs/libgmbridge.aar` contains arm64 device and x86_64
 emulator libraries. To regenerate it from the pinned Go source:
@@ -95,16 +106,26 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 ./libgm-android/build-android.sh
 ```
 
-Milestone 4 intentionally uses a manual document import rather than putting
-credentials in app source or build files. Transfer a copy of the paired
-`libgm-proof/session.json` to the phone, import it from the app, then remove the
-unencrypted transferred copy. The app validates it and stores only an
-AES-GCM-encrypted copy backed by an app-only Android Keystore key. Every
-connection saves refreshed auth before disconnecting.
+For normal setup, open `tools/credential-qr/index.html` directly in a current
+private browser window. Paste the Google Messages `/web/config` request copied
+as cURL and generate the QR. The page is self-contained, blocks network
+connections with Content Security Policy, keeps nothing in local storage, and
+clears the pasted command after generation.
+
+In the Android app, tap **Scan credential QR and pair**, scan the displayed QR,
+then approve the exact emoji in Google Messages. The scanner processes the QR
+on-device without this app requesting camera permission. The app accepts only
+the versioned `GM1` payload, retains only the supported cookies, and stores the
+resulting session with Android Keystore-backed AES-GCM encryption.
+
+The manual `session.json` import remains as a diagnostic fallback. Every libgm
+connection persists refreshed auth before disconnecting, and all libgm
+operations are serialized to prevent competing refreshes.
 
 See [docs/milestone-4-device-verification.md](docs/milestone-4-device-verification.md)
-for the conservative one-message deletion test. The notification listener does
-not invoke this bridge in milestone 4.
+for the conservative one-message deletion test. See
+[docs/milestones-5-6-device-verification.md](docs/milestones-5-6-device-verification.md)
+for automatic deletion and QR pairing acceptance tests.
 
 ## Build and test the libgm proof
 
@@ -121,8 +142,8 @@ go build -o gmproof ./cmd/gmproof
 ### Pair
 
 Use a private Firefox window to sign into the Google Messages `/web/config`
-page, then obtain the request cookies through DevTools. Milestone 6 will provide
-the local cURL-to-QR helper; for this isolated proof, put only the required
+page, then obtain the request cookies through DevTools. The QR helper above is
+the preferred Android setup; for the isolated CLI proof, put only the required
 cookie values in a local `cookies.json`:
 
 ```json
@@ -199,9 +220,15 @@ session file for subsequent tests; delete both credential files when finished.
 - Exact matching rejects outgoing and ambiguous results.
 - Imported Android auth is AES-GCM encrypted with an Android Keystore key and
   excluded from backup/device transfer.
+- Pending automatic-deletion targets are separately encrypted at rest and are
+  removed after a terminal outcome.
 - Android deletion requires a recent incoming message to be selected manually
-  and confirmed explicitly.
-- Automatic Android inbox deletion is not present in milestones 1–4.
+  and confirmed explicitly, or a unique automatic match across exact text,
+  sender, direction, and timestamp.
+- Automatic deletion uses WorkManager network constraints, exponential backoff,
+  and no more than three attempts. Missing and ambiguous matches preserve the
+  inbox message; uncertain delete responses are not retried.
+- Notification bodies, senders, raw cookies, and auth data are never logged.
 
 ## License
 

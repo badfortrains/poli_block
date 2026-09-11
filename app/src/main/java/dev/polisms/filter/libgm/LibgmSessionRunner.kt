@@ -2,20 +2,38 @@ package dev.polisms.filter.libgm
 
 import dev.polisms.filter.security.LibgmAuthStore
 
+class SessionPersistenceException(
+    val operationCompleted: Boolean,
+    cause: Throwable,
+) : Exception(
+    if (operationCompleted) {
+        "The libgm operation completed but refreshed authentication could not be saved"
+    } else {
+        "Refreshed libgm authentication could not be saved"
+    },
+    cause,
+)
+
 class LibgmSessionRunner(
     private val authStore: LibgmAuthStore,
     private val clientFactory: LibgmClientFactory,
 ) {
-    fun <T> withConnectedClient(block: (LibgmClient) -> T): T {
+    fun <T> withConnectedClient(block: (LibgmClient) -> T): T =
+        LibgmOperationLock.run { runConnected(block) }
+
+    private fun <T> runConnected(block: (LibgmClient) -> T): T {
         val authData = authStore.load()
             ?: throw IllegalStateException("Import a paired libgm session first")
         var client: LibgmClient? = null
         var operationError: Throwable? = null
+        var operationCompleted = false
 
         try {
             client = clientFactory.create(authData)
             client.connect()
-            return block(client)
+            val result = block(client)
+            operationCompleted = true
+            return result
         } catch (error: Throwable) {
             operationError = error
             throw error
@@ -33,7 +51,7 @@ class LibgmSessionRunner(
                     if (operationError != null) {
                         operationError.addSuppressed(saveError)
                     } else {
-                        throw saveError
+                        throw SessionPersistenceException(operationCompleted, saveError)
                     }
                 } finally {
                     connectedClient.disconnect()

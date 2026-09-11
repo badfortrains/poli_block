@@ -19,13 +19,25 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.work.WorkManager
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import dev.polisms.filter.deletion.DeletionScheduler
+import dev.polisms.filter.deletion.DeletionState
+import dev.polisms.filter.deletion.DeletionStatusStore
+import dev.polisms.filter.deletion.EncryptedPendingDeletionStore
 import dev.polisms.filter.filtering.Stop2EndFilter
 import dev.polisms.filter.libgm.GoLibgmClientFactory
+import dev.polisms.filter.libgm.GoLibgmPairingClientFactory
+import dev.polisms.filter.libgm.LibgmPairingClient
 import dev.polisms.filter.libgm.LibgmMessage
+import dev.polisms.filter.libgm.LibgmOperationLock
 import dev.polisms.filter.libgm.LibgmSessionRunner
 import dev.polisms.filter.notification.MessagesNotificationListener
 import dev.polisms.filter.notification.ReplacementNotificationManager
 import dev.polisms.filter.security.EncryptedLibgmAuthStore
+import dev.polisms.filter.security.QrCredentialPayload
 import java.io.IOException
 import java.text.DateFormat
 import java.util.Date
@@ -35,8 +47,10 @@ class MainActivity : Activity() {
     private lateinit var notificationAccessStatus: TextView
     private lateinit var appNotificationsStatus: TextView
     private lateinit var sessionStatus: TextView
+    private lateinit var automaticDeletionStatus: TextView
     private lateinit var operationStatus: TextView
     private lateinit var importButton: Button
+    private lateinit var scanPairButton: Button
     private lateinit var fetchButton: Button
     private lateinit var deleteButton: Button
     private lateinit var clearButton: Button
@@ -45,9 +59,13 @@ class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val authStore by lazy { EncryptedLibgmAuthStore(applicationContext) }
     private val clientFactory = GoLibgmClientFactory()
+    private val pairingClientFactory = GoLibgmPairingClientFactory()
     private val sessionRunner by lazy { LibgmSessionRunner(authStore, clientFactory) }
+    private val deletionStatusStore by lazy { DeletionStatusStore(applicationContext) }
     private var messages: List<LibgmMessage> = emptyList()
     private var busy = false
+    @Volatile private var activePairingClient: LibgmPairingClient? = null
+    private var pairingDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +80,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        activePairingClient?.cancel()
+        pairingDialog?.dismiss()
         executor.shutdown()
         super.onDestroy()
     }
@@ -82,7 +102,7 @@ class MainActivity : Activity() {
         }
 
         content.addView(text("Political SMS Filter", 28f, Color.rgb(25, 38, 53), 0, 16))
-        content.addView(text("Milestones 1–4", 14f, Color.rgb(75, 91, 107), 0, 28))
+        content.addView(text("Milestones 1–6", 14f, Color.rgb(75, 91, 107), 0, 28))
 
         content.addView(text("Notification access", 18f, Color.BLACK, 0, 6))
         notificationAccessStatus = text("Checking…", 16f, Color.DKGRAY, 0, 10)
@@ -101,6 +121,8 @@ class MainActivity : Activity() {
 
         content.addView(text("Filter", 18f, Color.BLACK, 26, 6))
         content.addView(text("Messages containing (case-insensitive): ${Stop2EndFilter.KEYWORD}", 16f, Color.DKGRAY, 0, 16))
+        automaticDeletionStatus = text("Checking automatic deletion status…", 15f, Color.DKGRAY, 0, 10)
+        content.addView(automaticDeletionStatus)
 
         content.addView(text("Filter app notifications", 18f, Color.BLACK, 12, 6))
         appNotificationsStatus = text("Checking…", 16f, Color.DKGRAY, 0, 10)
@@ -110,12 +132,15 @@ class MainActivity : Activity() {
             ReplacementNotificationManager(this).postTest()
         })
 
-        content.addView(text("Manual libgm deletion proof", 18f, Color.BLACK, 26, 6))
-        content.addView(text("Import the paired session.json created by libgm-proof. It is encrypted with an app-only Android Keystore key.", 16f, Color.DKGRAY, 0, 10))
+        content.addView(text("Google Messages pairing", 18f, Color.BLACK, 26, 6))
+        content.addView(text("Scan the offline desktop helper's QR, approve the displayed emoji in Google Messages, and the resulting session will be encrypted with Android Keystore.", 16f, Color.DKGRAY, 0, 10))
         sessionStatus = text("Checking…", 16f, Color.DKGRAY, 0, 10)
         content.addView(sessionStatus)
 
-        importButton = button("Import paired session.json") { openSessionPicker() }
+        scanPairButton = button("Scan credential QR and pair") { scanCredentialQr() }
+        content.addView(scanPairButton)
+
+        importButton = button("Import paired session.json (fallback)") { openSessionPicker() }
         content.addView(importButton)
 
         fetchButton = button("Fetch recent incoming messages") { fetchMessages() }
@@ -161,6 +186,97 @@ class MainActivity : Activity() {
         )
     }
 
+    private fun scanCredentialQr() {
+        if (busy) return
+        setBusy(true)
+        operationStatus.text = "Opening the on-device QR scanner…"
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .enableAutoZoom()
+            .build()
+        GmsBarcodeScanning.getClient(this, options)
+            .startScan()
+            .addOnSuccessListener { barcode ->
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+                val rawValue = barcode.rawValue
+                setBusy(false)
+                if (rawValue == null) {
+                    operationStatus.text = "⚠ Scanned QR did not contain text."
+                } else {
+                    pairFromQr(rawValue.encodeToByteArray())
+                }
+            }
+            .addOnCanceledListener {
+                if (isFinishing || isDestroyed) return@addOnCanceledListener
+                setBusy(false)
+                operationStatus.text = "QR scan canceled."
+            }
+            .addOnFailureListener { error ->
+                if (isFinishing || isDestroyed) return@addOnFailureListener
+                setBusy(false)
+                showError("QR scan failed", error)
+            }
+    }
+
+    private fun pairFromQr(rawPayload: ByteArray) {
+        runOperation("Validating credential QR and starting pairing…") {
+            try {
+                val cookieData = QrCredentialPayload.decode(rawPayload)
+                try {
+                    LibgmOperationLock.run {
+                        val pairingClient = pairingClientFactory.create(cookieData)
+                        activePairingClient = pairingClient
+                        try {
+                            val emoji = pairingClient.start()
+                            showPairingDialog(emoji)
+                            val authData = pairingClient.finish()
+                            try {
+                                authStore.save(authData)
+                                deletionStatusStore.setAutomaticDeletionEnabled(true)
+                            } finally {
+                                authData.fill(0)
+                            }
+                        } finally {
+                            activePairingClient = null
+                            pairingClient.disconnect()
+                            dismissPairingDialog()
+                        }
+                    }
+                } finally {
+                    cookieData.fill(0)
+                }
+            } finally {
+                rawPayload.fill(0)
+            }
+            runOnUiThreadIfAlive {
+                updateMessageChoices(emptyList())
+                operationStatus.text = "✓ Google Messages pairing succeeded and the session is encrypted."
+            }
+        }
+    }
+
+    private fun showPairingDialog(emoji: String) {
+        runOnUiThreadIfAlive {
+            pairingDialog?.dismiss()
+            pairingDialog = AlertDialog.Builder(this)
+                .setTitle("Approve this emoji")
+                .setMessage(
+                    "$emoji\n\nOpen Google Messages and approve this exact emoji for the new paired device. " +
+                        "This window will close when pairing finishes.",
+                )
+                .setNegativeButton("Cancel pairing") { _, _ -> activePairingClient?.cancel() }
+                .setCancelable(false)
+                .show()
+        }
+    }
+
+    private fun dismissPairingDialog() {
+        runOnUiThreadIfAlive {
+            pairingDialog?.dismiss()
+            pairingDialog = null
+        }
+    }
+
     private fun importSession(uri: Uri) {
         runOperation("Validating and encrypting imported session…") {
             val authData = readLimited(uri)
@@ -168,6 +284,7 @@ class MainActivity : Activity() {
                 val client = clientFactory.create(authData)
                 try {
                     authStore.save(authData)
+                    deletionStatusStore.setAutomaticDeletionEnabled(true)
                 } finally {
                     client.disconnect()
                 }
@@ -233,19 +350,29 @@ class MainActivity : Activity() {
     private fun confirmClearCredentials() {
         AlertDialog.Builder(this)
             .setTitle("Clear imported credentials?")
-            .setMessage("The encrypted paired session and its Android Keystore key will be removed from this app.")
+            .setMessage("The encrypted paired session, pending deletion targets, and their Android Keystore keys will be removed from this app.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Clear") { _, _ ->
-                try {
-                    authStore.clear()
-                    updateMessageChoices(emptyList())
-                    operationStatus.text = "✓ Imported credentials cleared."
-                    refreshSessionControls()
-                } catch (error: Throwable) {
-                    showError("Could not clear credentials", error)
-                }
+                clearCredentials()
             }
             .show()
+    }
+
+    private fun clearCredentials() {
+        runOperation("Canceling pending work and clearing credentials…") {
+            deletionStatusStore.setAutomaticDeletionEnabled(false)
+            WorkManager.getInstance(this).cancelAllWorkByTag(DeletionScheduler.WORK_TAG)
+            LibgmOperationLock.run {
+                EncryptedPendingDeletionStore(this).clearAll()
+                authStore.clear()
+                deletionStatusStore.record(DeletionState.NEVER)
+            }
+            runOnUiThreadIfAlive {
+                updateMessageChoices(emptyList())
+                operationStatus.text = "✓ Imported credentials and pending deletion data cleared."
+                refreshAutomaticDeletionStatus()
+            }
+        }
     }
 
     private fun runOperation(
@@ -317,13 +444,38 @@ class MainActivity : Activity() {
         notificationAccessStatus.text = if (hasNotificationListenerAccess()) "✓ Enabled" else "⚠ Not enabled"
         val enabled = getSystemService(NotificationManager::class.java).areNotificationsEnabled()
         appNotificationsStatus.text = if (enabled) "✓ Enabled" else "⚠ Not enabled"
+        refreshAutomaticDeletionStatus()
         refreshSessionControls()
+    }
+
+    private fun refreshAutomaticDeletionStatus() {
+        if (!::automaticDeletionStatus.isInitialized) return
+        val status = deletionStatusStore.load()
+        val summary = when (status.state) {
+            DeletionState.NEVER -> "No automatic deletion attempted yet"
+            DeletionState.QUEUED -> "Deletion queued; waiting for network/work execution"
+            DeletionState.RETRYING -> "Transient failure; bounded retry ${status.attempt + 1} of 3 queued"
+            DeletionState.DELETED -> "✓ Last blocked message was matched uniquely and deleted"
+            DeletionState.NO_MATCH -> "Preserved: no high-confidence match"
+            DeletionState.AMBIGUOUS -> "Preserved: matching result was ambiguous"
+            DeletionState.AUTH_REQUIRED -> "⚠ Pairing needs repair; message was preserved"
+            DeletionState.UNCERTAIN -> "⚠ Delete outcome was uncertain; no automatic retry"
+            DeletionState.FAILED -> "⚠ Deletion failed safely after bounded attempts"
+        }
+        val time = if (status.timestampMillis > 0) {
+            " · " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                .format(Date(status.timestampMillis))
+        } else {
+            ""
+        }
+        automaticDeletionStatus.text = "$summary$time"
     }
 
     private fun refreshSessionControls() {
         if (!::sessionStatus.isInitialized) return
         val hasSession = authStore.hasSession()
         sessionStatus.text = if (hasSession) "✓ Encrypted paired session stored" else "⚠ No paired session imported"
+        scanPairButton.isEnabled = !busy
         importButton.isEnabled = !busy
         fetchButton.isEnabled = !busy && hasSession
         clearButton.isEnabled = !busy && hasSession

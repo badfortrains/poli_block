@@ -4,8 +4,8 @@ Copyright (C) 2026 Political SMS Filter contributors
 This project is licensed under the GNU Affero General Public License,
 version 3 or (at your option) any later version. See LICENSE.
 
-The milestone-3 command-line proof and milestone-4 Android bridge import libgm
-from mautrix-gmessages:
+The command-line proof and Android bridge import libgm from
+mautrix-gmessages:
 
   Project: mautrix-gmessages
   Author: Tulir Asokan and contributors
@@ -20,6 +20,14 @@ The Android bridge is generated with Go Mobile:
   Source: https://go.googlesource.com/mobile
   Version used: v0.0.0-20260908204917-8b95e45f8d3e
   License: BSD 3-Clause; see THIRD_PARTY_NOTICES
+
+The offline credential helper includes the Nayuki QR Code generator:
+
+  Project: QR Code generator library
+  Author: Project Nayuki
+  Source: https://github.com/nayuki/QR-Code-generator
+  Version used: v1.8.0
+  License: MIT; see THIRD_PARTY_NOTICES
 
 libgm implements an unofficial Google Messages web protocol. Google Messages
 is a trademark of Google LLC; this project is not affiliated with or endorsed

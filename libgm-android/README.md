@@ -8,9 +8,11 @@ This Go module exposes the narrow milestone-4 API needed by Android:
 - delete exactly one caller-selected message ID
 - return refreshed auth data
 - disconnect
+- pair from a validated, minimized Google cookie payload and return the emoji
+  confirmation plus final `AuthData`
 
-It does not pair, scan credentials, match notifications, run persistently, or
-delete conversations. Android owns encrypted storage and runs every blocking
+It does not scan credentials, match notifications, run persistently, or delete
+conversations. Android owns encrypted storage and runs every blocking
 call away from the main thread.
 
 ## Build

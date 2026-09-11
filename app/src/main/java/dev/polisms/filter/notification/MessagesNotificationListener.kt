@@ -4,6 +4,7 @@ import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import dev.polisms.filter.deletion.DeletionScheduler
 import dev.polisms.filter.filtering.Stop2EndFilter
 
 class MessagesNotificationListener : NotificationListenerService() {
@@ -11,6 +12,7 @@ class MessagesNotificationListener : NotificationListenerService() {
     private val filter = Stop2EndFilter()
     private val deduplicator = RecentNotificationDeduplicator()
     private val replacementManager by lazy { ReplacementNotificationManager(this) }
+    private val deletionScheduler by lazy { DeletionScheduler(applicationContext) }
 
     override fun onCreate() {
         super.onCreate()
@@ -42,7 +44,11 @@ class MessagesNotificationListener : NotificationListenerService() {
         cancelNotification(message.notificationKey)
 
         if (blocked) {
-            Log.i(TAG, "Blocked notification suppressed; deletion is intentionally deferred to milestone 5")
+            if (deletionScheduler.enqueue(message)) {
+                Log.i(TAG, "Blocked notification suppressed and deletion work queued")
+            } else {
+                Log.w(TAG, "Blocked notification suppressed but deletion work could not be queued")
+            }
             return
         }
         replacementManager.post(message)

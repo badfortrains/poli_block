@@ -59,7 +59,9 @@ class LibgmSessionRunnerTest {
 
         val error = runCatching { runner.withConnectedClient { "completed" } }.exceptionOrNull()
 
-        assertEquals("save failed", error?.message)
+        assertTrue(error is SessionPersistenceException)
+        assertTrue((error as SessionPersistenceException).operationCompleted)
+        assertEquals("save failed", error.cause?.message)
         assertTrue(client.disconnected)
     }
 

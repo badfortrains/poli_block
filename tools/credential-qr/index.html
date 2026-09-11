@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>Political SMS Filter credential QR</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/qrcodegen.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Google Messages credential QR</h1>
+    <p class="warning">This page runs locally and makes no network requests. The cURL text and generated QR contain account credentials. Keep them private.</p>
+
+    <label for="curl-input">Paste the Google Messages <code>/web/config</code> request copied as cURL</label>
+    <textarea id="curl-input" rows="12" spellcheck="false" autocomplete="off" placeholder="curl 'https://messages.google.com/web/config...' -H 'cookie: SID=…; HSID=…'"></textarea>
+
+    <div class="actions">
+      <button id="generate" type="button">Generate local QR</button>
+      <button id="clear" type="button" class="secondary">Clear</button>
+    </div>
+
+    <p id="status" role="status" aria-live="polite">Nothing has been processed.</p>
+    <section id="qr-panel" hidden>
+      <canvas id="qr" aria-label="Credential QR code"></canvas>
+      <p>In Political SMS Filter, tap <strong>Scan credential QR and pair</strong>. After pairing succeeds, clear this page and close the private browser window.</p>
+    </section>
+  </main>
+</body>
+</html>
