@@ -33,8 +33,5 @@ class Stop2EndFilterTest {
         sender = null,
         text = text,
         timestamp = 0,
-        contentIntent = null,
-        category = null,
-        channelId = null,
     )
 }

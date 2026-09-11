@@ -1,8 +1,8 @@
 # Political SMS Filter
 
 An Android proof-of-concept that leaves Google Messages as the default SMS/RCS
-app, makes its own notifications silent, and selectively replaces allowed
-notifications. Messages containing `Stop2End` (case-insensitive) are suppressed.
+app, keeps its notifications silent, and vibrates directly for allowed messages.
+Messages containing `Stop2End` (case-insensitive) are suppressed.
 
 This repository implements development milestones 1–6. Milestones 1–4 are
 device-verified; the new automatic deletion and QR bootstrap paths await their
@@ -10,11 +10,10 @@ final physical-device acceptance tests.
 
 ## Status
 
-- **Milestone 1 — implemented:** listen only to Google Messages, cancel a
-  parseable conversation notification, post an alerting replacement, and carry
-  forward the original conversation `PendingIntent`.
+- **Milestone 1 — implemented:** listen only to Google Messages, retain allowed
+  conversation notifications, and vibrate directly without posting a replacement.
 - **Milestone 2 — implemented:** messages containing `Stop2End`, in any case,
-  have their Google notification canceled with no replacement.
+  have their Google notification canceled without triggering vibration.
 - **Milestone 3 — implemented:** the standalone Go proof can pair through
   imported Google cookies, connect, list recent messages, locate one unique
   exact incoming match, explicitly delete a known message ID, save refreshed
@@ -40,7 +39,7 @@ protocol that can change without notice.
 ## Repository layout
 
 ```text
-app/            Android notification replacement and filter proof
+app/            Android notification listener, vibration, and filter proof
 libgm-proof/    Independent desktop Go/libgm command-line proof
 libgm-android/  Minimal Go Mobile wrapper and reproducible AAR build script
 tools/          Offline desktop credential QR helper
@@ -79,14 +78,12 @@ Install it from Android Studio or with:
 
 On first launch:
 
-1. Allow this app to post notifications.
-2. Tap **Grant notification access** and enable Political SMS Filter.
-3. Open the Google Messages notification settings from the app.
-4. Leave Google Messages notifications enabled, but set all relevant incoming
+1. Tap **Grant notification access** and enable Political SMS Filter.
+2. Open the Google Messages notification settings from the app.
+3. Leave Google Messages notifications enabled, but set all relevant incoming
    message channels to no sound and no vibration.
-5. Tap **Test replacement notification** and confirm this app's `Messages`
-   channel produces the desired sound/vibration.
-6. Complete Google Messages pairing using the offline QR flow below, or retain
+4. Tap **Test vibration** and confirm the phone produces the desired vibration.
+5. Complete Google Messages pairing using the offline QR flow below, or retain
    an already imported milestone-4 session.
 
 Do not disable Google Messages notifications entirely: the listener needs the

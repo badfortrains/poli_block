@@ -31,9 +31,6 @@ class GoogleMessagesNotificationParser : NotificationParser {
             sender = sender,
             text = text,
             timestamp = messagingMessage?.timestamp?.takeIf { it > 0 } ?: notification.postTime,
-            contentIntent = source.contentIntent,
-            category = source.category,
-            channelId = source.channelId,
         )
     }
 

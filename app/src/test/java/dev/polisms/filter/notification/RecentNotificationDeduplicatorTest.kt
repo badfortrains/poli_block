@@ -37,8 +37,5 @@ class RecentNotificationDeduplicatorTest {
         sender = null,
         text = text,
         timestamp = timestamp,
-        contentIntent = null,
-        category = null,
-        channelId = null,
     )
 }

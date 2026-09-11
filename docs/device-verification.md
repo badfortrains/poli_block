@@ -7,13 +7,10 @@ that setup before interpreting the results.
 ## Preparation
 
 1. Install the debug APK and open **Political SMS Filter**.
-2. Grant notification posting permission.
-3. Grant notification-listener access.
-4. In Google Messages notification settings, leave notifications enabled but
+2. Grant notification-listener access.
+3. In Google Messages notification settings, leave notifications enabled but
    disable sound and vibration on every channel that receives incoming SMS.
-5. In this app's notification settings, make sure the `Messages` channel uses
-   sound and/or vibration.
-6. Tap **Test replacement notification** once. Confirm exactly one alert.
+4. Tap **Test vibration** once. Confirm exactly one vibration.
 
 For safe diagnostics, use:
 
@@ -21,10 +18,10 @@ For safe diagnostics, use:
 adb logcat -s PoliticalSmsFilter
 ```
 
-The log reports receipt, filter decision, and replacement state, but not sender
+The log reports receipt, filter decision, and vibration state, but not sender
 or message content.
 
-## Milestone 1 — replacement
+## Milestone 1 — retained notification and direct vibration
 
 Send this SMS from another number:
 
@@ -36,11 +33,9 @@ Expected:
 
 - Google Messages stores the SMS.
 - Google Messages itself produces no sound or vibration.
-- Its original notification is canceled.
-- Political SMS Filter produces exactly one alerting notification.
-- The replacement displays sender and preview.
-- Tapping it opens the corresponding Google Messages conversation. If the
-  source notification has no usable content intent, it opens Google Messages.
+- Its original notification remains visible with Google Messages' native UI.
+- Political SMS Filter produces exactly one direct vibration and no notification.
+- Tapping the notification opens the corresponding Google Messages conversation.
 
 ## Milestone 2 — filtering
 
@@ -56,7 +51,7 @@ Expected for each:
 
 - Google Messages stores the SMS; milestones 1–2 do not delete inbox content.
 - Its notification is canceled.
-- Political SMS Filter posts no replacement notification.
+- Political SMS Filter posts no notification.
 - No sound or vibration occurs, assuming Google Messages was configured silent.
 
 Finally, send:
@@ -65,10 +60,10 @@ Finally, send:
 This says stop to end, but not the keyword.
 ```
 
-Expected: it is allowed and receives one replacement notification.
+Expected: its Google Messages notification remains and it receives one direct vibration.
 
 ## Fail-open check
 
-Non-message and group-summary notifications from Google Messages should not be
-turned into replacement alerts. Notifications that do not expose a parseable
-message body are left untouched rather than guessed at.
+Non-message and group-summary notifications from Google Messages should not
+trigger vibration. Notifications that do not expose a parseable message body
+are left untouched rather than guessed at.

@@ -23,7 +23,7 @@ camera permission; final auth is encrypted and survives an app restart.
 ## Milestone 5 — normal and blocked messages
 
 First confirm Google Messages notification channels remain enabled but silent,
-and the Political SMS Filter `Messages` channel can alert.
+then use **Test vibration** in Political SMS Filter.
 
 Send a normal disposable message:
 
@@ -31,8 +31,8 @@ Send a normal disposable message:
 Hey, want to get dinner tomorrow?
 ```
 
-Expected: it stays in Google Messages and produces one replacement alert from
-Political SMS Filter.
+Expected: it stays in Google Messages, its native notification remains visible,
+and Political SMS Filter produces one direct vibration.
 
 Then send a distinctive disposable blocked message:
 
@@ -43,7 +43,7 @@ Acceptance test 7f31. Stop2End
 Expected:
 
 - Google Messages itself remains silent.
-- Its notification is canceled and no replacement appears.
+- Its notification is canceled and no vibration occurs.
 - WorkManager connects only when a network is available.
 - The message disappears from Google Messages after one unique exact match.
 - The app status reports that the last blocked message was deleted.

@@ -1,12 +1,10 @@
 package dev.polisms.filter.ui
 
-import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -34,8 +32,8 @@ import dev.polisms.filter.libgm.LibgmPairingClient
 import dev.polisms.filter.libgm.LibgmMessage
 import dev.polisms.filter.libgm.LibgmOperationLock
 import dev.polisms.filter.libgm.LibgmSessionRunner
+import dev.polisms.filter.notification.MessageVibrator
 import dev.polisms.filter.notification.MessagesNotificationListener
-import dev.polisms.filter.notification.ReplacementNotificationManager
 import dev.polisms.filter.security.EncryptedLibgmAuthStore
 import dev.polisms.filter.security.QrCredentialPayload
 import java.io.IOException
@@ -45,7 +43,6 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var notificationAccessStatus: TextView
-    private lateinit var appNotificationsStatus: TextView
     private lateinit var sessionStatus: TextView
     private lateinit var automaticDeletionStatus: TextView
     private lateinit var operationStatus: TextView
@@ -69,9 +66,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ReplacementNotificationManager(this).ensureChannel()
         setContentView(buildContent())
-        requestNotificationPermissionIfNeeded()
     }
 
     override fun onResume() {
@@ -115,7 +110,7 @@ class MainActivity : Activity() {
         content.addView(text("Set every Google Messages notification channel to silent: no sound and no vibration.", 16f, Color.DKGRAY, 0, 10))
         content.addView(button("Open Google Messages notification settings") {
             startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, ReplacementNotificationManager.GOOGLE_MESSAGES_PACKAGE)
+                putExtra(Settings.EXTRA_APP_PACKAGE, MessagesNotificationListener.GOOGLE_MESSAGES_PACKAGE)
             })
         })
 
@@ -124,12 +119,10 @@ class MainActivity : Activity() {
         automaticDeletionStatus = text("Checking automatic deletion status…", 15f, Color.DKGRAY, 0, 10)
         content.addView(automaticDeletionStatus)
 
-        content.addView(text("Filter app notifications", 18f, Color.BLACK, 12, 6))
-        appNotificationsStatus = text("Checking…", 16f, Color.DKGRAY, 0, 10)
-        content.addView(appNotificationsStatus)
-        content.addView(button("Test replacement notification") {
-            requestNotificationPermissionIfNeeded()
-            ReplacementNotificationManager(this).postTest()
+        content.addView(text("Filter vibration", 18f, Color.BLACK, 12, 6))
+        content.addView(text("Allowed messages use this vibration while keeping the original Google Messages notification.", 16f, Color.DKGRAY, 0, 10))
+        content.addView(button("Test vibration") {
+            MessageVibrator(this).vibrate()
         })
 
         content.addView(text("Google Messages pairing", 18f, Color.BLACK, 26, 6))
@@ -442,8 +435,6 @@ class MainActivity : Activity() {
 
     private fun refreshStatus() {
         notificationAccessStatus.text = if (hasNotificationListenerAccess()) "✓ Enabled" else "⚠ Not enabled"
-        val enabled = getSystemService(NotificationManager::class.java).areNotificationsEnabled()
-        appNotificationsStatus.text = if (enabled) "✓ Enabled" else "⚠ Not enabled"
         refreshAutomaticDeletionStatus()
         refreshSessionControls()
     }
@@ -515,14 +506,6 @@ class MainActivity : Activity() {
         val enabled = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
             ?: return false
         return enabled.split(':').any { ComponentName.unflattenFromString(it) == component }
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
-        }
     }
 
     private fun text(value: String, size: Float, color: Int, top: Int, bottom: Int): TextView =

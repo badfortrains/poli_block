@@ -11,16 +11,11 @@ class MessagesNotificationListener : NotificationListenerService() {
     private val parser: NotificationParser = GoogleMessagesNotificationParser()
     private val filter = Stop2EndFilter()
     private val deduplicator = RecentNotificationDeduplicator()
-    private val replacementManager by lazy { ReplacementNotificationManager(this) }
+    private val messageVibrator by lazy { MessageVibrator(this) }
     private val deletionScheduler by lazy { DeletionScheduler(applicationContext) }
 
-    override fun onCreate() {
-        super.onCreate()
-        replacementManager.ensureChannel()
-    }
-
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        if (sbn == null || sbn.packageName != ReplacementNotificationManager.GOOGLE_MESSAGES_PACKAGE) {
+        if (sbn == null || sbn.packageName != GOOGLE_MESSAGES_PACKAGE) {
             return
         }
         if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
@@ -41,9 +36,9 @@ class MessagesNotificationListener : NotificationListenerService() {
 
         val blocked = filter.shouldBlock(message)
         Log.i(TAG, "Filter result: ${if (blocked) "BLOCK" else "ALLOW"}")
-        cancelNotification(message.notificationKey)
 
         if (blocked) {
+            cancelNotification(message.notificationKey)
             if (deletionScheduler.enqueue(message)) {
                 Log.i(TAG, "Blocked notification suppressed and deletion work queued")
             } else {
@@ -51,11 +46,12 @@ class MessagesNotificationListener : NotificationListenerService() {
             }
             return
         }
-        replacementManager.post(message)
-        Log.i(TAG, "Posted replacement notification")
+        messageVibrator.vibrate()
+        Log.i(TAG, "Allowed Google Messages notification retained and vibration requested")
     }
 
     companion object {
+        const val GOOGLE_MESSAGES_PACKAGE = "com.google.android.apps.messaging"
         private const val TAG = "PoliticalSmsFilter"
     }
 }

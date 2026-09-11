@@ -26,8 +26,5 @@ class DeletionSchedulerTest {
         sender = "Example",
         text = text,
         timestamp = timestamp,
-        contentIntent = null,
-        category = null,
-        channelId = null,
     )
 }
