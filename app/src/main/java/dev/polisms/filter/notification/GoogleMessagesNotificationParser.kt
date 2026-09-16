@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import android.service.notification.StatusBarNotification
+import android.util.Log
 
 class GoogleMessagesNotificationParser : NotificationParser {
     private data class ParsedMessage(
@@ -17,11 +18,14 @@ class GoogleMessagesNotificationParser : NotificationParser {
         val source = notification.notification
         val extras = source.extras ?: Bundle.EMPTY
         val messagingMessage = newestMessagingStyleMessage(extras)
+        val messagingText = messagingMessage?.text?.toString()?.takeIf { it.isNotBlank() }
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() }
+        val regularText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }
 
-        val text = messagingMessage?.text?.toString()?.takeIf { it.isNotBlank() }
-            ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() }
-            ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }
-            ?: return null
+        logCandidateLengths(messagingText, bigText, regularText)
+
+        val (text, textSource) = selectText(messagingText, bigText, regularText) ?: return null
+        logMessage(text, textSource)
 
         val sender = messagingMessage?.sender?.toString()?.takeIf { it.isNotBlank() }
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
@@ -75,5 +79,53 @@ class GoogleMessagesNotificationParser : NotificationParser {
             message.sender
         }
         return sender?.toString()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun logMessage(text: String, source: String) {
+        val chunks = text.chunked(LOG_CHUNK_SIZE)
+        chunks.forEachIndexed { index, chunk ->
+            Log.d(
+                TAG,
+                "Notification message from $source (${text.length} chars), " +
+                    "chunk ${index + 1}/${chunks.size}: $chunk",
+            )
+        }
+    }
+
+    private fun logCandidateLengths(
+        messagingText: String?,
+        bigText: String?,
+        regularText: String?,
+    ) {
+        Log.d(
+            TAG,
+            "Notification candidate lengths: " +
+                "MessagingStyle=${messagingText.lengthOrMissing()}, " +
+                "EXTRA_BIG_TEXT=${bigText.lengthOrMissing()}, " +
+                "EXTRA_TEXT=${regularText.lengthOrMissing()}",
+        )
+    }
+
+    private fun String?.lengthOrMissing(): String = this?.length?.toString() ?: "missing"
+
+    internal fun selectText(
+        messagingText: String?,
+        bigText: String?,
+        regularText: String?,
+    ): Pair<String, String>? {
+        if (messagingText != null && !messagingText.isImagePlaceholder()) {
+            return messagingText to "MessagingStyle"
+        }
+        return bigText?.let { it to "EXTRA_BIG_TEXT" }
+            ?: regularText?.let { it to "EXTRA_TEXT" }
+            ?: messagingText?.let { it to "MessagingStyle" }
+    }
+
+    private fun String.isImagePlaceholder(): Boolean = trim().equals(IMAGE_PLACEHOLDER, ignoreCase = true)
+
+    private companion object {
+        const val TAG = "PoliticalSmsFilter"
+        const val LOG_CHUNK_SIZE = 1_000
+        const val IMAGE_PLACEHOLDER = "Image"
     }
 }

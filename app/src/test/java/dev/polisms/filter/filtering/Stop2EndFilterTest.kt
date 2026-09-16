@@ -38,6 +38,16 @@ class Stop2EndFilterTest {
         assertFalse(filter.shouldBlock(message("Stop at the end")))
     }
 
+    @Test
+    fun blocksNotificationAtTruncationLengthWithoutKeyword() {
+        assertTrue(filter.shouldBlock(message("a".repeat(Stop2EndFilter.TRUNCATED_NOTIFICATION_LENGTH))))
+    }
+
+    @Test
+    fun fullTextCheckDoesNotTreatLengthAsAFilterMatch() {
+        assertFalse(filter.matchesFullText("a".repeat(Stop2EndFilter.TRUNCATED_NOTIFICATION_LENGTH)))
+    }
+
     private fun message(text: String) = IncomingMessageNotification(
         notificationKey = "test",
         sender = null,

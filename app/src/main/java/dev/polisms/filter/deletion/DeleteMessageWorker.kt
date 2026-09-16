@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import dev.polisms.filter.filtering.Stop2EndFilter
 import dev.polisms.filter.libgm.GoLibgmClientFactory
 import dev.polisms.filter.libgm.LibgmMessage
 import dev.polisms.filter.libgm.LibgmSessionRunner
@@ -19,6 +20,7 @@ class DeleteMessageWorker(
     private val authStore = EncryptedLibgmAuthStore(appContext)
     private val sessionRunner = LibgmSessionRunner(authStore, GoLibgmClientFactory())
     private val matcher = MessageMatcher()
+    private val filter = Stop2EndFilter()
 
     override fun doWork(): Result {
         val targetId = inputData.getString(TARGET_ID_KEY)
@@ -40,6 +42,7 @@ class DeleteMessageWorker(
         }
 
         var archiveIssued = false
+        var fullTextRejected = false
         return try {
             val match = sessionRunner.withConnectedClient { client ->
                 val encoded = client.fetchRecentIncomingMessages(
@@ -54,21 +57,26 @@ class DeleteMessageWorker(
                 val result = matcher.find(target, recent)
                 when (result) {
                     is MatchResult.Unique -> {
-                        if (!statusStore.isAutomaticDeletionEnabled()) {
-                            throw AutomaticDeletionDisabledException()
-                        }
-                        archiveIssued = true
-                        try {
-                            client.archiveConversation(result.message.conversationId)
-                        } catch (error: Throwable) {
-                            throw ArchiveRequestException(error)
+                        if (!filter.matchesFullText(result.message.text)) {
+                            fullTextRejected = true
+                            MatchResult.None
+                        } else {
+                            if (!statusStore.isAutomaticDeletionEnabled()) {
+                                throw AutomaticDeletionDisabledException()
+                            }
+                            archiveIssued = true
+                            try {
+                                client.archiveConversation(result.message.conversationId)
+                            } catch (error: Throwable) {
+                                throw ArchiveRequestException(error)
+                            }
+                            result
                         }
                     }
                     MatchResult.None,
                     MatchResult.Ambiguous,
-                    -> Unit
+                    -> result
                 }
-                result
             }
             when (match) {
                 is MatchResult.Unique -> {
@@ -76,7 +84,11 @@ class DeleteMessageWorker(
                     terminal(targetId, DeletionState.ARCHIVED, Result.success())
                 }
                 MatchResult.None -> {
-                    Log.i(TAG, "No high-confidence message match; nothing archived")
+                    if (fullTextRejected) {
+                        Log.i(TAG, "Matched message did not pass the full-text filter; nothing archived")
+                    } else {
+                        Log.i(TAG, "No high-confidence message match; nothing archived")
+                    }
                     terminal(targetId, DeletionState.NO_MATCH, Result.success())
                 }
                 MatchResult.Ambiguous -> {
