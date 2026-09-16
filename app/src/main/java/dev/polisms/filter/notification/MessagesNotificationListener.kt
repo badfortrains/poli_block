@@ -1,6 +1,7 @@
 package dev.polisms.filter.notification
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -15,6 +16,14 @@ class MessagesNotificationListener : NotificationListenerService() {
     private val deletionScheduler by lazy { DeletionScheduler(applicationContext) }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        handleNotification(sbn, rankingFor(sbn, currentRanking))
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification?, rankingMap: RankingMap?) {
+        handleNotification(sbn, rankingFor(sbn, rankingMap))
+    }
+
+    private fun handleNotification(sbn: StatusBarNotification?, ranking: Ranking?) {
         if (sbn == null || sbn.packageName != GOOGLE_MESSAGES_PACKAGE) {
             return
         }
@@ -46,12 +55,31 @@ class MessagesNotificationListener : NotificationListenerService() {
             }
             return
         }
+
+        if (!shouldVibrateForImportance(ranking?.importance)) {
+            Log.i(TAG, "Allowed Google Messages notification retained without vibration because the conversation is silent")
+            return
+        }
         messageVibrator.vibrate()
         Log.i(TAG, "Allowed Google Messages notification retained and vibration requested")
+    }
+
+    private fun rankingFor(sbn: StatusBarNotification?, rankingMap: RankingMap?): Ranking? {
+        if (sbn == null || rankingMap == null) return null
+        return Ranking().takeIf { rankingMap.getRanking(sbn.key, it) }
     }
 
     companion object {
         const val GOOGLE_MESSAGES_PACKAGE = "com.google.android.apps.messaging"
         private const val TAG = "PoliticalSmsFilter"
     }
+}
+
+internal fun shouldVibrateForImportance(importance: Int?): Boolean = when (importance) {
+    NotificationManager.IMPORTANCE_NONE,
+    NotificationManager.IMPORTANCE_MIN,
+    NotificationManager.IMPORTANCE_LOW,
+    -> false
+
+    else -> true
 }
