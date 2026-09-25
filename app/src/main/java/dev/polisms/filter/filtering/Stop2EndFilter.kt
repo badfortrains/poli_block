@@ -11,6 +11,6 @@ class Stop2EndFilter : MessageFilter {
 
     companion object {
         const val TRUNCATED_NOTIFICATION_LENGTH = 1_024
-        val KEYWORDS = listOf("Stop2End", "STOP to quit", "Stop to End", "End2End")
+        val KEYWORDS = listOf("Stop2End", "STOP to quit", "Stop to End", "End2End", "Text STOP to unsubscribe")
     }
 }
