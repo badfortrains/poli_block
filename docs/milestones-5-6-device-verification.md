@@ -78,5 +78,26 @@ adb logcat -s PoliticalSmsFilter
 ```
 
 Logs report only lifecycle decisions such as queued, unique, ambiguous, retry,
-or auth required. They must not contain sender names, phone numbers, message
-bodies, cookies, message IDs, or auth material.
+or auth required. Matcher diagnostics also report aggregate candidate counts,
+text lengths, common-prefix length, and closest timestamp difference. They must
+not contain sender names, phone numbers, message bodies, cookies, message IDs,
+or auth material.
+
+The default device log buffer may retain only a few minutes on a busy device.
+Increase the main buffer for the current boot before testing:
+
+```bash
+adb logcat -b main -G 16M
+adb logcat -b main -g
+```
+
+For the longest history, keep ADB connected and stream the tag to a file on the
+development computer:
+
+```bash
+adb logcat -v threadtime -s PoliticalSmsFilter > polisms-filter.log
+```
+
+Increasing the ring buffer cannot recover entries that have already been
+evicted. A continuous capture lasts until the command exits and should be
+deleted when debugging is complete.

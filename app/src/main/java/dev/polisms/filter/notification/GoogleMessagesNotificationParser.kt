@@ -25,7 +25,7 @@ class GoogleMessagesNotificationParser : NotificationParser {
         logCandidateLengths(messagingText, bigText, regularText)
 
         val (text, textSource) = selectText(messagingText, bigText, regularText) ?: return null
-        logMessage(text, textSource)
+        Log.d(TAG, "Selected $textSource notification text (${text.length} chars)")
 
         val sender = messagingMessage?.sender?.toString()?.takeIf { it.isNotBlank() }
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
@@ -81,17 +81,6 @@ class GoogleMessagesNotificationParser : NotificationParser {
         return sender?.toString()?.takeIf { it.isNotBlank() }
     }
 
-    private fun logMessage(text: String, source: String) {
-        val chunks = text.chunked(LOG_CHUNK_SIZE)
-        chunks.forEachIndexed { index, chunk ->
-            Log.d(
-                TAG,
-                "Notification message from $source (${text.length} chars), " +
-                    "chunk ${index + 1}/${chunks.size}: $chunk",
-            )
-        }
-    }
-
     private fun logCandidateLengths(
         messagingText: String?,
         bigText: String?,
@@ -125,7 +114,6 @@ class GoogleMessagesNotificationParser : NotificationParser {
 
     private companion object {
         const val TAG = "PoliticalSmsFilter"
-        const val LOG_CHUNK_SIZE = 1_000
         const val IMAGE_PLACEHOLDER = "Image"
     }
 }

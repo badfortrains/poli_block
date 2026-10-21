@@ -25,12 +25,19 @@ class DeleteMessageWorker(
     override fun doWork(): Result {
         val targetId = inputData.getString(TARGET_ID_KEY)
             ?.takeIf { it.matches(TARGET_ID_PATTERN) }
-            ?: return Result.failure()
+            ?: run {
+                Log.w(TAG, "Archive work has a missing or invalid target ID")
+                return Result.failure()
+            }
         val target = try {
             pendingStore.load(targetId)
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not load the encrypted archive target", error)
             return terminal(targetId, DeletionState.FAILED, Result.failure())
-        } ?: return Result.success()
+        } ?: run {
+            Log.i(TAG, "Archive target is no longer pending; nothing to do")
+            return Result.success()
+        }
 
         if (!statusStore.isAutomaticDeletionEnabled()) {
             return terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
@@ -43,17 +50,21 @@ class DeleteMessageWorker(
 
         var archiveIssued = false
         var fullTextRejected = false
+        var stage = "connecting to Google Messages"
         return try {
             val match = sessionRunner.withConnectedClient { client ->
+                stage = "fetching recent conversations"
                 val encoded = client.fetchRecentIncomingMessages(
                     conversationCount = RECENT_CONVERSATION_COUNT,
                     messagesPerConversation = RECENT_MESSAGE_COUNT,
                 )
+                stage = "decoding recent conversations"
                 val recent = try {
                     LibgmMessage.decode(encoded)
                 } finally {
                     encoded.fill(0)
                 }
+                stage = "matching the notification to a conversation"
                 val result = matcher.find(target, recent)
                 when (result) {
                     is MatchResult.Unique -> {
@@ -65,6 +76,7 @@ class DeleteMessageWorker(
                                 throw AutomaticDeletionDisabledException()
                             }
                             archiveIssued = true
+                            stage = "sending the archive request"
                             try {
                                 client.archiveConversation(result.message.conversationId)
                             } catch (error: Throwable) {
@@ -98,8 +110,12 @@ class DeleteMessageWorker(
             }
         } catch (_: AutomaticDeletionDisabledException) {
             terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
-        } catch (_: ArchiveRequestException) {
-            Log.w(TAG, "Archive response was uncertain; the exact conversation ID will not be retried")
+        } catch (error: ArchiveRequestException) {
+            Log.w(
+                TAG,
+                "Archive request failed after being issued; outcome is uncertain and will not be retried",
+                error,
+            )
             terminal(targetId, DeletionState.UNCERTAIN, Result.failure())
         } catch (error: SessionPersistenceException) {
             val state = if (archiveIssued && error.operationCompleted) {
@@ -107,18 +123,19 @@ class DeleteMessageWorker(
             } else {
                 DeletionState.FAILED
             }
-            Log.w(TAG, "Refreshed libgm authentication could not be persisted")
+            Log.w(TAG, "Refreshed libgm authentication could not be persisted", error)
             terminal(targetId, state, Result.failure())
         } catch (error: Throwable) {
+            val attempt = runAttemptCount + 1
             if (DeletionFailureClassifier.isAuthenticationFailure(error)) {
-                Log.w(TAG, "Archiving stopped due to an authentication failure")
+                Log.w(TAG, "Archive work failed during $stage due to an authentication failure", error)
                 terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
-            } else if (runAttemptCount + 1 < MAX_ATTEMPTS) {
-                Log.w(TAG, "Transient archiving failure; scheduling a bounded retry")
-                statusStore.record(DeletionState.RETRYING, runAttemptCount + 1)
+            } else if (attempt < MAX_ATTEMPTS) {
+                Log.w(TAG, "Archive work failed during $stage on attempt $attempt; scheduling a retry", error)
+                statusStore.record(DeletionState.RETRYING, attempt)
                 Result.retry()
             } else {
-                Log.w(TAG, "Archiving failed after the final retry")
+                Log.w(TAG, "Archive work failed during $stage on final attempt $attempt", error)
                 terminal(targetId, DeletionState.FAILED, Result.failure())
             }
         }

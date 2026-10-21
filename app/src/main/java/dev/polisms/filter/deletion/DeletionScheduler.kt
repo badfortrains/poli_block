@@ -1,6 +1,7 @@
 package dev.polisms.filter.deletion
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
@@ -37,7 +38,8 @@ class DeletionScheduler(private val context: Context) {
             )
             statusStore.record(DeletionState.QUEUED)
             true
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not persist or enqueue archive work", error)
             runCatching { pendingStore.remove(id) }
             statusStore.record(DeletionState.FAILED)
             false
@@ -47,6 +49,7 @@ class DeletionScheduler(private val context: Context) {
     companion object {
         private const val UNIQUE_WORK_PREFIX = "delete-message-"
         const val WORK_TAG = "political-sms-deletion"
+        private const val TAG = "PoliticalSmsFilter"
     }
 }
 

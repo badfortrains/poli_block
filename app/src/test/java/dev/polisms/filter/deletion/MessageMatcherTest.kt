@@ -2,11 +2,12 @@ package dev.polisms.filter.deletion
 
 import dev.polisms.filter.libgm.LibgmMessage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageMatcherTest {
-    private val matcher = MessageMatcher()
+    private val matcher = MessageMatcher(diagnosticsLogger = {})
     private val target = DeletionTarget(
         sender = "+1 (415) 555-0123",
         text = "Campaign update. Stop2End",
@@ -95,6 +96,32 @@ class MessageMatcherTest {
         val result = matcher.find(target.copy(sender = null), listOf(candidate(sender = "")))
 
         assertTrue(result is MatchResult.Unique)
+    }
+
+    @Test
+    fun `diagnostics identify the failed matching stage without message contents`() {
+        val diagnostics = mutableListOf<String>()
+        val diagnosticMatcher = MessageMatcher(diagnosticsLogger = diagnostics::add)
+        val lateCandidate = candidate(
+            timestampMillis = target.timestampMillis +
+                MessageMatcher.DEFAULT_TIMESTAMP_TOLERANCE_MILLIS + 1,
+        )
+
+        val result = diagnosticMatcher.find(target, listOf(lateCandidate))
+
+        assertEquals(MatchResult.None, result)
+        assertEquals(1, diagnostics.size)
+        val message = diagnostics.single()
+        assertTrue(message.contains("fetched=1"))
+        assertTrue(message.contains("textPrefixMatches=1"))
+        assertTrue(message.contains("textAndSenderMatches=1"))
+        assertTrue(message.contains("completeMatches=0"))
+        assertTrue(message.contains("closestTimestampDeltaMs=120001"))
+        assertTrue(message.contains("result=NONE"))
+        assertFalse(message.contains(target.text))
+        assertFalse(message.contains(target.sender!!))
+        assertFalse(message.contains(lateCandidate.messageId))
+        assertFalse(message.contains(lateCandidate.conversationId))
     }
 
     private fun candidate(
