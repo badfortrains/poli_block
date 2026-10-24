@@ -9,6 +9,9 @@ require (
 	go.mau.fi/mautrix-gmessages v0.2605.0
 )
 
+// Keep the pinned release, with a local hard timeout for phone RPC responses.
+replace go.mau.fi/mautrix-gmessages => ../third_party/mautrix-gmessages
+
 require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect

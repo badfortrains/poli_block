@@ -52,12 +52,15 @@ class DeleteMessageWorker(
         var fullTextRejected = false
         var stage = "connecting to Google Messages"
         return try {
+            ensureWorkerActive()
             val match = sessionRunner.withConnectedClient { client ->
+                ensureWorkerActive()
                 stage = "fetching recent conversations"
                 val encoded = client.fetchRecentIncomingMessages(
                     conversationCount = RECENT_CONVERSATION_COUNT,
                     messagesPerConversation = RECENT_MESSAGE_COUNT,
                 )
+                ensureWorkerActive()
                 stage = "decoding recent conversations"
                 val recent = try {
                     LibgmMessage.decode(encoded)
@@ -72,6 +75,7 @@ class DeleteMessageWorker(
                             fullTextRejected = true
                             MatchResult.None
                         } else {
+                            ensureWorkerActive()
                             if (!statusStore.isAutomaticDeletionEnabled()) {
                                 throw AutomaticDeletionDisabledException()
                             }
@@ -108,6 +112,10 @@ class DeleteMessageWorker(
                     terminal(targetId, DeletionState.AMBIGUOUS, Result.success())
                 }
             }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            Log.i(TAG, "Archive work was stopped; leaving its target pending for rescheduling")
+            Result.retry()
         } catch (_: AutomaticDeletionDisabledException) {
             terminal(targetId, DeletionState.AUTH_REQUIRED, Result.failure())
         } catch (error: ArchiveRequestException) {
@@ -138,6 +146,12 @@ class DeleteMessageWorker(
                 Log.w(TAG, "Archive work failed during $stage on final attempt $attempt", error)
                 terminal(targetId, DeletionState.FAILED, Result.failure())
             }
+        }
+    }
+
+    private fun ensureWorkerActive() {
+        if (isStopped || Thread.currentThread().isInterrupted) {
+            throw InterruptedException("Archive worker was stopped")
         }
     }
 
